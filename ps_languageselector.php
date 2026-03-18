@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * 2007-2020 PrestaShop SA and Contributors
  *
@@ -34,7 +36,7 @@ class Ps_Languageselector extends Module implements WidgetInterface
     /**
      * @var string Name of the module running on PS 1.6.x. Used for data migration.
      */
-    const PS_16_EQUIVALENT_MODULE = 'blocklanguages';
+    public const PS_16_EQUIVALENT_MODULE = 'blocklanguages';
 
     private $templateFile;
 
