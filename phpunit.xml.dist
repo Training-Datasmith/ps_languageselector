@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap.php"
+         colors="true"
+         verbose="true">
+    <testsuites>
+        <testsuite name="module-tests">
+            <file>tests/ConfigXmlTest.php</file>
+            <file>tests/IndexGuardTest.php</file>
+            <file>tests/InstallTest.php</file>
+            <file>tests/ModuleMetadataTest.php</file>
+            <file>tests/RenderWidgetTest.php</file>
+            <file>tests/TemplateRenderTest.php</file>
+            <file>tests/WidgetVariablesTest.php</file>
+        </testsuite>
+    </testsuites>
+</phpunit>
