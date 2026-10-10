@@ -131,10 +131,15 @@ function assertCleanResult($result, $label)
  */
 function readCapturedPrinterOutput(PHPUnit_TextUI_ResultPrinter $printer)
 {
-    $ref = new ReflectionClass('PHPUnit_Util_Printer');
-    $outProp = $ref->getProperty('out');
-    $outProp->setAccessible(true);
-    $out = $outProp->getValue($printer);
+    try {
+        $ref = new ReflectionClass('PHPUnit_Util_Printer');
+        $outProp = $ref->getProperty('out');
+        $outProp->setAccessible(true);
+        $out = $outProp->getValue($printer);
+    } catch (ReflectionException $e) {
+        fwrite(STDERR, 'Failed to read PHPUnit printer capture stream: ' . $e->getMessage() . PHP_EOL);
+        exit(1);
+    }
 
     if (!is_resource($out)) {
         fwrite(STDERR, 'Failed to read PHPUnit printer capture stream' . PHP_EOL);
@@ -177,8 +182,8 @@ function runCapturedSuite($runner, $suite, array $runnerArguments, $label, array
     $result = $runner->doRun($suite, $runnerArguments);
     $output = readCapturedPrinterOutput($printer);
 
-    assertNoDiagnostics($output, $patterns);
     fwrite(STDOUT, $output);
+    assertNoDiagnostics($output, $patterns);
 
     assertCleanResult($result, $label);
 
