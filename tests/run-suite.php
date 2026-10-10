@@ -169,7 +169,7 @@ if ($orderedResult->count() !== $expectedTestCount) {
     exit(1);
 }
 
-mt_srand(20261010);
+srand(20261010);
 shuffle($pairs);
 
 $shuffledSuite = new PHPUnit_Framework_TestSuite('module-tests-shuffled');
