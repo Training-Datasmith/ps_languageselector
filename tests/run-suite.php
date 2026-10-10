@@ -78,9 +78,6 @@ if (!$phpunitPhar || !is_file($phpunitPhar)) {
 
 require $phpunitPhar;
 
-ob_start();
-
-$configurationFile = $repoRoot . '/phpunit.xml.dist';
 $bootstrap = $repoRoot . '/tests/bootstrap.php';
 require_once $bootstrap;
 
@@ -95,6 +92,7 @@ $diagnosticPatterns = array(
 
 /**
  * @param string $output
+ * @param array  $patterns
  */
 function assertNoDiagnostics($output, array $patterns)
 {
@@ -127,6 +125,67 @@ function assertCleanResult($result, $label)
 }
 
 /**
+ * @param PHPUnit_TextUI_ResultPrinter $printer
+ *
+ * @return string
+ */
+function readCapturedPrinterOutput(PHPUnit_TextUI_ResultPrinter $printer)
+{
+    $ref = new ReflectionClass('PHPUnit_Util_Printer');
+    $outProp = $ref->getProperty('out');
+    $outProp->setAccessible(true);
+    $out = $outProp->getValue($printer);
+
+    if (!is_resource($out)) {
+        fwrite(STDERR, 'Failed to read PHPUnit printer capture stream' . PHP_EOL);
+        exit(1);
+    }
+
+    rewind($out);
+    $output = stream_get_contents($out);
+
+    if ($output === false) {
+        fwrite(STDERR, 'Failed to read PHPUnit printer capture stream' . PHP_EOL);
+        exit(1);
+    }
+
+    return $output;
+}
+
+/**
+ * @param PHPUnit_TextUI_TestRunner    $runner
+ * @param PHPUnit_Framework_TestSuite  $suite
+ * @param array                        $runnerArguments
+ * @param string                       $label
+ * @param array                        $patterns
+ *
+ * @return PHPUnit_Framework_TestResult
+ */
+function runCapturedSuite($runner, $suite, array $runnerArguments, $label, array $patterns)
+{
+    $colors = !empty($runnerArguments['colors'])
+        ? PHPUnit_TextUI_ResultPrinter::COLOR_AUTO
+        : PHPUnit_TextUI_ResultPrinter::COLOR_NEVER;
+
+    $printer = new PHPUnit_TextUI_ResultPrinter(
+        'php://temp',
+        !empty($runnerArguments['verbose']),
+        $colors
+    );
+    $runner->setPrinter($printer);
+
+    $result = $runner->doRun($suite, $runnerArguments);
+    $output = readCapturedPrinterOutput($printer);
+
+    assertNoDiagnostics($output, $patterns);
+    fwrite(STDOUT, $output);
+
+    assertCleanResult($result, $label);
+
+    return $result;
+}
+
+/**
  * @param PHPUnit_Framework_TestSuite $suite
  * @param array                       $pairs
  */
@@ -141,7 +200,17 @@ function collectTestPairs(PHPUnit_Framework_TestSuite $suite, array &$pairs)
     }
 }
 
-$runner = new PHPUnit_TextUI_TestRunner();
+$configurationFile = $repoRoot . '/phpunit.xml.dist';
+
+$runnerArguments = array(
+    'bootstrap' => $bootstrap,
+    'configuration' => $configurationFile,
+    'testdox' => false,
+    'verbose' => true,
+    'colors' => true,
+    'disallowTestOutput' => true,
+    'reportUselessTests' => true,
+);
 
 $orderedSuite = new PHPUnit_Framework_TestSuite('module-tests');
 foreach ($expectedFiles as $file) {
@@ -154,16 +223,9 @@ if (count($pairs) !== $expectedTestCount) {
     exit(1);
 }
 
-$orderedResult = $runner->doRun($orderedSuite, array(
-    'testdox' => false,
-), false);
+$orderedRunner = new PHPUnit_TextUI_TestRunner();
+$orderedResult = runCapturedSuite($orderedRunner, $orderedSuite, $runnerArguments, 'Ordered', $diagnosticPatterns);
 
-$outputBuffer = ob_get_contents();
-if ($outputBuffer !== false) {
-    assertNoDiagnostics($outputBuffer, $diagnosticPatterns);
-}
-
-assertCleanResult($orderedResult, 'Ordered');
 if ($orderedResult->count() !== $expectedTestCount) {
     fwrite(STDERR, 'Ordered run test count mismatch' . PHP_EOL);
     exit(1);
@@ -181,16 +243,9 @@ foreach ($pairs as $pair) {
     $addTestMethod->invoke($shuffledSuite, $classReflection, $methodReflection);
 }
 
-$shuffledResult = $runner->doRun($shuffledSuite, array(
-    'testdox' => false,
-), false);
+$shuffledRunner = new PHPUnit_TextUI_TestRunner();
+$shuffledResult = runCapturedSuite($shuffledRunner, $shuffledSuite, $runnerArguments, 'Shuffled', $diagnosticPatterns);
 
-$outputBuffer2 = ob_get_contents();
-if ($outputBuffer2 !== false) {
-    assertNoDiagnostics($outputBuffer2, $diagnosticPatterns);
-}
-
-assertCleanResult($shuffledResult, 'Shuffled');
 if ($shuffledResult->count() !== $expectedTestCount) {
     fwrite(STDERR, 'Shuffled run test count mismatch' . PHP_EOL);
     exit(1);
